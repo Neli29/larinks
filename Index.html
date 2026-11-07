@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Интерактивна карта на ларинкса</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f5f2f8;color:#30263b;font:15px Arial,sans-serif}
+header{background:#68458f;color:white;padding:20px;text-align:center}
+header h1{margin:0 0 6px;font-size:24px}
+nav{position:sticky;top:0;z-index:5;background:#fff;padding:10px;display:flex;gap:7px;flex-wrap:wrap;justify-content:center;box-shadow:0 2px 8px #0001}
+button{cursor:pointer}
+nav button,.controls button{border:0;border-radius:20px;padding:9px 13px;background:#eee6f5;color:#52366f;font-weight:bold}
+nav button.active{background:#7654a5;color:white}
+main{max-width:1500px;margin:auto;padding:16px}
+.intro{background:white;border-radius:12px;padding:13px;margin-bottom:14px;line-height:1.5}
+.panel{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,.8fr);gap:15px;background:white;border-radius:14px;padding:14px;box-shadow:0 2px 10px #0001}
+.visual{position:relative;min-width:0;align-self:start}
+.visual img{display:block;width:100%;height:auto;border:1px solid #ddd;border-radius:8px}
+.callouts{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.callouts polyline{fill:none;stroke:#d83f83;stroke-width:0.42;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.callouts circle.target{fill:#fff;stroke:#d83f83;stroke-width:1.5;vector-effect:non-scaling-stroke}
+.marker{position:absolute;transform:translate(-50%,-50%);width:27px;height:27px;border-radius:50%;border:2px solid white;background:#d83f83;color:white;font-weight:bold;box-shadow:0 1px 5px #2228;display:grid;place-items:center;font-size:12px;z-index:2}
+.marker.active{background:#ffb000;color:#24152f;outline:3px solid #fff}
+.legend{max-height:78vh;overflow:auto}
+.legend h2{font-size:19px;color:#5b3b79;margin:3px 0 12px}
+.entry{width:100%;display:flex;gap:9px;align-items:flex-start;text-align:left;border:1px solid #eee4f5;background:#faf8fc;border-radius:9px;padding:9px;margin-bottom:7px;color:#30263b}
+.entry.active{background:#eee2f8;border:2px solid #9671b7}
+.num{flex:0 0 26px;height:26px;border-radius:50%;display:grid;place-items:center;background:#7654a5;color:white;font-weight:bold;font-size:12px}
+.entry b{display:block;font-size:13px;margin:1px 0 4px}
+.latin{display:block;color:#765b8d;font-style:italic;font-size:12px}
+.desc{display:block;font-size:12px;line-height:1.4;margin-top:5px;color:#51465b}
+.caption{font-size:12px;color:#74677d;margin:8px 0}
+.status{font-size:12px;color:#806b8f;margin:8px 0 0}
+@media(max-width:800px){.panel{grid-template-columns:1fr}.legend{max-height:none}.visual{overflow:visible}.marker{width:24px;height:24px}}
+</style>
+</head>
+<body>
+<header>
+<h1>Интерактивен анатомичен атлас на ларинкса</h1>
+<div>Работа с предоставените 7 изображения</div>
+</header>
+<nav id="tabs"></nav>
+<main>
+<div class="intro"><b>Как се използва:</b> Избери раздел, после натисни номер в списъка. Съответният номер ще се освети върху схемата. Розовите линии свързват номерата с посочените области. Снимките се зареждат от папка <b>images</b>.</div>
+<div id="content"></div>
+</main>
+<script>
+const sections=[
+{title:"Хрущяли и кост",img:"larinks1.jpg",items:[
+["Надгръклянник","Epiglottis","Листовиден хрущял в горната част на ларинкса.",{x:20,y:13}],
+["Подезична кост","Os hyoideum","Намира се над ларинкса.",{x:18,y:24}],
+["Щитовиден хрущял","Cartilago thyroidea","Големият щитовиден хрущял, оформя предната и страничните стени.",{x:18,y:58}],
+["Горна щитовидна изрезка","Incisura thyroidea superior","Изрезка в горния ръб на щитовидния хрущял.",{x:15,y:45}],
+["Черпаловидни хрущяли","Cartilagines arytenoideae","Чифтни хрущяли върху задната част на пръстеновидния хрущял.",{x:69,y:48}],
+["Пръстеновиден хрущял","Cartilago cricoidea","Пръстеновиден хрущял под щитовидния.",{x:18,y:75}],
+["Трахея","Trachea","Продължава под пръстеновидния хрущял.",{x:18,y:88}]
+]},
+{title:"Връзки и мембрани",img:"larinks2.jpg",items:[
+["Щитовидно-подезична мембрана","Membrana thyrohyoidea","Между подезичната кост и щитовидния хрущял.",{x:73,y:29}],
+["Странична щитовидно-подезична връзка","Ligamentum thyrohyoideum laterale","Странично уплътнение на мембраната.",{x:22,y:26}],
+["Преддверна връзка","Ligamentum vestibulare","Намира се над истинската гласна връзка.",{x:70,y:54}],
+["Гласна връзка","Ligamentum vocale","Вътре в ларинкса, под преддверната гънка.",{x:71,y:64}],
+["Пръстеновидно-щитовидна връзка","Ligamentum cricothyroideum","Между щитовидния и пръстеновидния хрущял.",{x:73,y:77}],
+["Пръстеновидно-трахеална връзка","Ligamentum cricotracheale","Между пръстеновидния хрущял и трахеята.",{x:72,y:88}],
+["Клиновиден хрущял","Cartilago cuneiformis","В черпаловидно-надгръклянната гънка.",{x:14,y:42}],
+["Рогчест хрущял","Cartilago corniculata","Върху върха на черпаловидния хрущял.",{x:13,y:50}]
+]},
+{title:"Мускули – страничен и заден изглед",img:"larinks4.jpg",items:[
+["Надгръклянно-черпаловиден мускул","Musculus aryepiglotticus","Мускул в черпаловидно-надгръклянната гънка.",{x:27,y:20}],
+["Щитовидно-надгръкляннен мускул","Musculus thyroepiglotticus","Свързва щитовидния хрущял с надгръклянника.",{x:28,y:35}],
+["Напречен черпаловиден мускул","Musculus arytenoideus transversus","Между двата черпаловидни хрущяла.",{x:77,y:37}],
+["Заден пръстеновидно-черпаловиден мускул","Musculus cricoarytenoideus posterior","Отзад; раздалечава гласните гънки.",{x:78,y:57}],
+["Страничен пръстеновидно-черпаловиден мускул","Musculus cricoarytenoideus lateralis","Странично; приближава гласните гънки.",{x:22,y:59}],
+["Щитовидно-черпаловиден мускул","Musculus thyroarytenoideus","Между щитовидния и черпаловидния хрущял.",{x:27,y:48}],
+["Пръстеновидно-щитовиден мускул","Musculus cricothyroideus","Външен мускул между щитовидния и пръстеновидния хрущял.",{x:24,y:75}],
+["Долен ларингеален нерв","Nervus laryngeus inferior","Инервира почти всички вътрешни мускули на ларинкса.",{x:82,y:70}]
+]},
+{title:"Хрущяли и вътрешни мускули",img:"larinks6.jpg",items:[
+["Надгръклянник","Epiglottis","Намира се най-горе; листовидна структура.",{x:17,y:40}],
+["Черпаловидно-надгръклянна гънка","Plica aryepiglottica","Гънката между черпаловидния хрущял и надгръклянника.",{x:26,y:29}],
+["Клиновиден хрущял","Cartilago cuneiformis","В дебелината на черпаловидно-надгръклянната гънка.",{x:25,y:37}],
+["Рогчест хрущял","Cartilago corniculata","Върху върха на черпаловидния хрущял.",{x:27,y:43}],
+["Черпаловиден хрущял","Cartilago arytenoidea","Чифтен хрущял в задната част на ларинкса.",{x:73,y:43}],
+["Напречен черпаловиден мускул","Musculus arytenoideus transversus","Между черпаловидните хрущяли.",{x:75,y:37}],
+["Заден пръстеновидно-черпаловиден мускул","Musculus cricoarytenoideus posterior","Заден мускул, разширява гласната цепка.",{x:73,y:62}],
+["Страничен пръстеновидно-черпаловиден мускул","Musculus cricoarytenoideus lateralis","Страничен мускул, участва в затварянето на гласната цепка.",{x:26,y:61}],
+["Щитовидно-черпаловиден мускул","Musculus thyroarytenoideus","Вътрешен мускул на ларинкса.",{x:27,y:51}],
+["Пръстеновидно-щитовиден мускул","Musculus cricothyroideus","Външен мускул в предната долна част.",{x:26,y:80}]
+]},
+{title:"Преден и заден изглед – хрущяли",img:"larinks7.jpg",items:[
+["Надгръклянник","Epiglottis","Горната листовидна структура.",{x:19,y:21}],
+["Подезична кост","Os hyoideum","Кост над ларинкса.",{x:17,y:14}],
+["Щитовидно-подезична мембрана","Membrana thyrohyoidea","Между подезичната кост и щитовидния хрущял.",{x:17,y:31}],
+["Щитовиден хрущял","Cartilago thyroidea","Големият щитовиден хрущял.",{x:24,y:59}],
+["Пръстеновиден хрущял","Cartilago cricoidea","Под щитовидния хрущял.",{x:25,y:78}],
+["Черпаловиден хрущял","Cartilago arytenoidea","В задната горна част на пръстеновидния хрущял.",{x:76,y:58}],
+["Рогчест хрущял","Cartilago corniculata","На върха на черпаловидния хрущял.",{x:77,y:47}],
+["Пръстеновидно-трахеална връзка","Ligamentum cricotracheale","Между пръстеновидния хрущял и трахеята.",{x:25,y:88}]
+]},
+{title:"Обобщена схема – ларингеални мускули",img:"larinks3.jpg",items:[
+["Надгръклянник","Epiglottis","Горна листовидна структура.",{x:49,y:17}],
+["Подезична кост","Os hyoideum","Намира се над ларинкса.",{x:76,y:17}],
+["Щитовиден хрущял","Cartilago thyroidea","Големият хрущял, ограждащ ларинкса.",{x:75,y:43}],
+["Четириъгълна мембрана","Membrana quadrangularis","Разположена в горната част на вътрешната стена.",{x:28,y:49}],
+["Щитовидно-черпаловиден мускул","Musculus thyroarytenoideus","Вътрешен мускул, участва в регулирането на напрежението на гласните гънки.",{x:29,y:61}],
+["Конус еластичен","Conus elasticus","Еластична мембрана; горният свободен ръб образува гласната връзка.",{x:49,y:77}],
+["Страничен пръстеновидно-черпаловиден мускул","Musculus cricoarytenoideus lateralis","Страничен вътрешен мускул.",{x:30,y:83}],
+["Заден пръстеновидно-черпаловиден мускул","Musculus cricoarytenoideus posterior","Заден вътрешен мускул.",{x:70,y:82}],
+["Напречен черпаловиден мускул","Musculus arytenoideus transversus","Нечифтен мускул между двата черпаловидни хрущяла.",{x:72,y:65}],
+["Кос черпаловиден мускул","Musculus arytenoideus obliquus","Косо разположен мускул в задната част.",{x:72,y:58}]
+]},
+{title:"Три изгледа – анатомия на ларинкса",img:"larinks5.jpg",items:[
+["Надгръклянник","Epiglottis","В горната част на ларинкса.",{x:52,y:38}],
+["Подезична кост","Os hyoideum","Над щитовидния хрущял.",{x:25,y:42}],
+["Щитовиден хрущял","Cartilago thyroidea","Големият преден хрущял.",{x:25,y:65}],
+["Пръстеновиден хрущял","Cartilago cricoidea","Под щитовидния хрущял.",{x:27,y:82}],
+["Черпаловидни хрущяли","Cartilagines arytenoideae","Задни чифтни хрущяли.",{x:52,y:72}],
+["Клиновиден хрущял","Cartilago cuneiformis","В черпаловидно-надгръклянната гънка.",{x:79,y:53}],
+["Рогчест хрущял","Cartilago corniculata","Върху черпаловидния хрущял.",{x:78,y:66}],
+["Преддверна връзка","Ligamentum vestibulare","Над истинската гласна връзка.",{x:78,y:72}],
+["Гласна връзка","Ligamentum vocale","Вътре в ларинкса, под преддверната връзка.",{x:77,y:78}],
+["Трахея","Trachea","Продължава под ларинкса.",{x:28,y:93}]
+]}
+];
+
+let current=0,chosen=-1;
+const tabs=document.getElementById('tabs'),content=document.getElementById('content');
+
+function render(){
+ tabs.innerHTML='';
+ sections.forEach((s,i)=>{
+  const b=document.createElement('button');
+  b.textContent=(i+1)+'. '+s.title;
+  b.className=i===current?'active':'';
+  b.onclick=()=>{current=i;chosen=-1;render();};
+  tabs.appendChild(b);
+ });
+ const s=sections[current];
+ content.innerHTML=`<div class="panel">
+ <div class="visual">
+  <img id="diagram" src="images/${s.img}" alt="${s.title}">
+  <svg class="callouts" id="callouts" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+  <div id="markers"></div>
+  <div class="caption">Изображение: ${s.img}. Номерата и линиите са ориентири към посочените области. При нужда сверявай с оригиналните надписи в анатомичната схема.</div>
+  <div class="status" id="imgStatus"></div>
+ </div>
+ <aside class="legend"><h2>${s.title}</h2><div id="entries"></div></aside>
+ </div>`;
+ const markers=document.getElementById('markers'),entries=document.getElementById('entries');
+ const svg=document.getElementById('callouts');
+ const count=s.items.length;
+ s.items.forEach((it,i)=>{
+  const p=it[3];
+  const side=(i%2===0)?4:96;
+  const labelY=8+(i*(84/Math.max(1,count-1)));
+  const elbowX=(side===4)?Math.max(7,p.x-7):Math.min(93,p.x+7);
+  const line=document.createElementNS('http://www.w3.org/2000/svg','polyline');
+  line.setAttribute('points',`${side},${labelY} ${elbowX},${labelY} ${p.x},${p.y}`);
+  svg.appendChild(line);
+  const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
+  dot.setAttribute('class','target');dot.setAttribute('cx',p.x);dot.setAttribute('cy',p.y);dot.setAttribute('r','0.8');svg.appendChild(dot);
+
+  const m=document.createElement('button');
+  m.className='marker';m.textContent=i+1;m.style.left=p.x+'%';m.style.top=p.y+'%';m.title=it[0];m.onclick=()=>select(i);markers.appendChild(m);
+
+  const e=document.createElement('button');e.className='entry';
+  e.innerHTML=`<span class="num">${i+1}</span><span><b>${it[0]}</b><span class="latin">${it[1]}</span><span class="desc">${it[2]}</span></span>`;
+  e.onclick=()=>select(i);entries.appendChild(e);
+ });
+ const img=document.getElementById('diagram');
+ img.onerror=()=>{document.getElementById('imgStatus').textContent='Снимката не е намерена. Провери дали файлът '+s.img+' е в папка images до Index.html.';};
+ img.onload=()=>{document.getElementById('imgStatus').textContent='';};
+ if(chosen>=0)select(chosen);
+}
+function select(i){
+ chosen=i;
+ document.querySelectorAll('.marker').forEach((x,n)=>x.classList.toggle('active',n===i));
+ document.querySelectorAll('.entry').forEach((x,n)=>x.classList.toggle('active',n===i));
+ const e=document.querySelectorAll('.entry')[i];if(e)e.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+render();
+</script>
+</body>
+</html>
